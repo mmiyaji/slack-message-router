@@ -26,7 +26,7 @@ const webhook = new IncomingWebhook(functions.config().slack.url);
 
 const LEVEL_CONFIG = {
     info: {
-        emoji: "ℹ️",
+        emoji: "",
         mention: "",
     },
     warning: {
