@@ -24,6 +24,25 @@ const { IncomingWebhook } = require('@slack/client');
 // Slack Incoming Webhook URLを環境設定から取得
 const webhook = new IncomingWebhook(functions.config().slack.url);
 
+const LEVEL_CONFIG = {
+    info: {
+        emoji: "ℹ️",
+        mention: "",
+    },
+    warning: {
+        emoji: "⚠️",
+        mention: "",
+    },
+    error: {
+        emoji: "❌",
+        mention: "<!here>",
+    },
+    critical: {
+        emoji: "🚨",
+        mention: "<!channel>",
+    },
+};
+
 /**
  * RESTリクエストを受け取り、Slackにメッセージを投稿するHTTP関数
  *
@@ -33,43 +52,47 @@ const webhook = new IncomingWebhook(functions.config().slack.url);
  *   "channel": "#general" // 投稿したいチャンネル（オプション、Webhookで指定されていれば不要）
  * }
  */
-exports.slackMessageRouter = functions.region('asia-northeast1')
-    .runWith({
-        timeoutSeconds: 60,
-        memory: '128MB',
-    })
+exports.slackMessageRouter = functions
+    .region("asia-northeast1")
+    .runWith({ timeoutSeconds: 60, memory: "128MB" })
     .https.onRequest(async (req, res) => {
-        // POSTリクエストのみを処理
-        if (req.method !== 'POST') {
-        return res.status(405).send('Method Not Allowed');
-    }
     res.set("Content-Type", "application/json; charset=utf-8");
-    let body = req.body;
-    if (!body || typeof body !== "object") {
-        try {
-            body = JSON.parse(req.rawBody.toString("utf8"));
-        } catch {
-            return res.status(400).send(JSON.stringify({ error: "Invalid JSON. Set Content-Type: application/json; charset=utf-8" }));
-        }
+
+    if (req.method !== "POST") {
+        return res.status(405).json({ error: "Method Not Allowed" });
     }
-    // リクエストボディからメッセージ情報を取得
-    const { text, channel } = req.body;
+
+    const { text, channel, level = "info" } = req.body || {};
 
     if (!text) {
-    return res.status(400).send('Bad Request: "text" field is required in the request body.');
+        return res.status(400).json({ error: '"text" is required' });
     }
+
+    const cfg = LEVEL_CONFIG[level] || LEVEL_CONFIG.info;
+
+    // Slack に送る最終メッセージ
+    const slackText = [
+        cfg.mention,
+        cfg.emoji,
+        text,
+    ].filter(Boolean).join(" ");
 
     try {
-    // Slackにメッセージを投稿
-    await webhook.send({
-        text: text,
-        channel: channel || undefined, // チャンネルが指定されていれば設定
-    });
+        await webhook.send({
+        text: slackText,
+        channel: channel || undefined,
+        });
 
-    functions.logger.info('Message successfully sent to Slack', { text, channel });
-    return res.status(200).send('Message sent to Slack successfully!');
-    } catch (error) {
-    functions.logger.error('Failed to send message to Slack', error);
-    return res.status(500).send('Failed to send message to Slack.');
+        functions.logger.info("Slack message sent", {
+        level,
+        channel,
+        text,
+        });
+
+        return res.status(200).json({ ok: true });
+    } catch (err) {
+        functions.logger.error("Slack send failed", err);
+        return res.status(500).json({ ok: false });
     }
 });
+

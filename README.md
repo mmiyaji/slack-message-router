@@ -72,7 +72,8 @@ POST https://asia-northeast1-<PROJECT_ID>.cloudfunctions.net/slackMessageRouter
 ```json
 {
   "text": "Slackに投稿したいメッセージ",
-  "channel": "#general"
+  "channel": "#general",
+  "level": "info"
 }
 ```
 
@@ -89,6 +90,14 @@ curl.exe -X POST "https://asia-northeast1-<PROJECT_ID>.cloudfunctions.net/slackM
   -d "{\"text\":\"これはFirebase Functionからのテストメッセージです！\"}"
 ```
 
+### 通知レベル（level）
+
+| level | 説明 | 挙動 |
+|---|---|---|
+| info | 通常通知 | メンションなし |
+| warning | 注意 | ⚠️ |
+| error | 障害 | ❌ + @here |
+| critical | 緊急 | 🚨 + @channel |
 
 ---
 
